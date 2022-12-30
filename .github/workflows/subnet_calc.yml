@@ -1,0 +1,237 @@
+import sys
+import os
+import subprocess
+#Have user select option. Each option leads to a different path
+path_list = [str(1), str(2), str(3), str(4)]
+path = input("""Would you like to:\n
+1. Specify number of subnets needed? (Will provide a Class C mask)\n
+2. Specify number of hosts per subnet?\n
+3. Specify a subnet mask (ex. 255.255.255.128)\n
+4. Specify CIDR notation (ex. /24)\n
+Please enter an option (1 - 4): """)
+while path not in path_list:
+    path = input("""Would you like to:\n
+    1. Specify number of subnets needed? (Will provide a Class C mask)\n
+    2. Specify number of hosts per subnet?\n
+    3. Specify a subnet mask (ex. 255.255.255.128)\n
+    4. Specify CIDR notation (ex. /24)\n
+    Please enter an option (1 - 4): """)
+
+
+#Option 1
+if path == "1":
+    spec_net = int(input("\nHow many subnets are needed?\nPlease enter a value between 1 and 128: "))
+    while spec_net > 128 or spec_net < 1:
+        spec_net = int(input("""\nHow many subnets are needed? 
+        Please enter a value between 1 and 128: """))
+    y = 1
+    while spec_net > y:
+        y = y * 2
+    subnets = y
+    class_var = "c"
+
+    #Calculate CIDR notation and available hosts
+    factor_count = 0
+    cidr_factor = subnets
+    while cidr_factor >= 2:
+        cidr_factor = cidr_factor / 2
+        factor_count = factor_count + 1
+    cidr = str(24 + factor_count)
+    net_hosts = 256 / subnets
+    avail_hosts = int(net_hosts - 2)
+
+    # Calculate subnet mask
+    octet4 = str(int(256 - (256 / subnets)))
+    subnet_mask = "255.255.255." + octet4
+
+
+#Option 2
+if path == str(2):
+    spec_hosts = int(input("\nHow many hosts per subnet do you need?\nPlease enter a value between 1 and 16,777,216: "))
+    while spec_hosts < 1 or spec_hosts > 16777216:
+        spec_hosts = int(input("""How many hosts per subnet do you need?
+            Please enter a value between 1 and 16,777,216: """))
+
+    #Calculate available hosts based on number of host needed
+    y = 2
+    z = 2
+    while spec_hosts >= (y - 1):
+        y = 2 ** z
+        z = z + 1
+    net_hosts = y
+    avail_hosts = (net_hosts - 2)
+
+    #Place into either Class A, B, or C and calculate number of available subnets
+    if net_hosts <= 256:
+        class_var = "c"
+        subnets = int(256 / net_hosts)
+    elif net_hosts > 256 and net_hosts <= 65536:
+        class_var = "b"
+        subnets = int(65536 / net_hosts)
+    elif net_hosts > 65536 and net_hosts <= 16777216:
+        class_var = "a"
+        subnets = int(16777216 / net_hosts)
+
+    #Calculate mask
+    mask = str(int(256 - (256 / subnets)))
+
+    #Place mask into full subnet mask
+    if class_var == "c":
+        octet2 = 255
+        octet3 = 255
+        octet4 = mask
+    if class_var == "b":
+        octet2 = 255
+        octet3 = mask
+        octet4 = 0
+    if class_var == "a":
+        octet2 = mask
+        octet3 = 0
+        octet4 = 0
+    subnet_mask = ("255." + str(octet2) + "." + str(octet3) + "." + str(octet4))
+
+    #Calculate CIDR notation
+    factor_count = 0
+    cidr_factor = subnets
+    while cidr_factor >= 2:
+        cidr_factor = cidr_factor / 2
+        factor_count = factor_count + 1
+    if class_var == "a":
+        cidr = str(8 + factor_count)
+    if class_var == "b":
+        cidr = str(16 + factor_count)
+    if class_var == "c":
+        cidr = str(24 + factor_count)
+
+
+#Option3
+octet_list = [255, 254, 252, 248, 240, 224, 192, 128, 0]
+#Gather subnet mask. Seperate each octet into a variable
+if path == str(3):
+    octet2 = int(input("""\nPlease enter the subnet mask:
+    1st Octet: 255
+    2nd Octet: """))
+    octet3 = int(input("    3rd Octet: "))
+    octet4 = int(input("    4th Octet: "))
+    while octet2 not in octet_list or octet3 not in octet_list or octet4 not in octet_list:
+        octet2 = int(input("""Please enter a valid subnet mask:
+        1st Octet: 255
+        2nd Octet: """))
+        octet3 = int(input("        3rd Octet: "))
+        octet4 = int(input("        4th Octet: "))
+    subnet_mask = str(255) + "." + str(octet2) + "." + str(octet3) + "." + str(octet4)
+
+    #Calulate available subnets
+    if octet2 in octet_list and octet2 < 255 and octet3 == 0 and octet4 == 0:
+        class_var = "a"
+        subnets = 256 / (256 - int(octet2))
+    elif octet3 in octet_list and octet3 < 255 and octet2 == 255 and octet4 == 0:
+        class_var = "b"
+        subnets = 256 / (256 - int(octet3))
+    elif octet4 in octet_list and octet2 == 255 and octet3 == 255:
+        class_var = "c"
+        subnets = 256 / (256 - int(octet4))
+    else:
+        input("You entered an invalid subnet mask. Please hit Enter to restart program.")
+        subprocess.call([sys.executable, os.path.realpath(__file__)] + sys.argv[1:])
+
+
+    #Calculate CIDR notation and available hosts
+    factor_count = 0
+    cidr_factor = subnets
+    while cidr_factor >= 2:
+        cidr_factor = cidr_factor / 2
+        factor_count = factor_count + 1
+    if class_var == "a":
+        cidr = str(8 + factor_count)
+        net_hosts = 16777216 / subnets
+    if class_var == "b":
+        cidr = str(16 + factor_count)
+        net_hosts = 65536 / subnets
+    if class_var == "c":
+        cidr = str(24 + factor_count)
+        net_hosts = 256 / subnets
+    avail_hosts = int(net_hosts - 2)
+    if octet4 == 255 or octet4 == 254:
+        avail_hosts = 1
+
+
+#Option 4
+if path == str(4):
+    cidr = int(input("\nEnter the subnet mask in CIDR notation: /"))
+    while cidr < 8 or cidr > 32:
+        cidr = int(input("Please enter a number between 8 and 32: /"))
+
+    #Seperate into Classes A, B, and C and calculate subnet mask
+    if cidr >= 24 and cidr <= 32:
+        mask = (256 - 2 ** (32 - cidr))
+        octet2 = 255
+        octet3 = 255
+        octet4 = mask
+        class_var = "c"
+    if cidr >= 16 and cidr < 24:
+        mask = (256 - 2 ** (24 - cidr))
+        octet2 = 255
+        octet3 = mask
+        octet4 = 0
+        class_var = "b"
+    if cidr >= 8 and cidr < 16:
+        mask = (256 - 2 ** (16 - cidr))
+        octet2 = mask
+        octet3 = 0
+        octet4 = 0
+        class_var = "a"
+    subnet_mask = ("255." + str(octet2) + "." + str(octet3) + "." + str(octet4))
+
+    #Calulate available subnets and hosts
+    octet_list = [255, 254, 252, 248, 240, 224, 192, 128, 0]
+    if octet2 in octet_list and octet2 < 255:
+        subnets = 256 / (256 - int(octet2))
+        net_hosts = int(16777216 / subnets)
+    elif octet3 in octet_list and octet3 < 255:
+        subnets = 256 / (256 - int(octet3))
+        net_hosts = int(65536 / subnets)
+    elif octet4 in octet_list:
+        subnets = 256 / (256 - int(octet4))
+        net_hosts = int(256 / subnets)
+    avail_hosts = (net_hosts - 2)
+
+
+#Output to user
+print("\n\n                 OUTPUT:")
+print("\nCIDR:                            /" + str(cidr))
+print("Subnet Mask:                     " + subnet_mask)
+print("Number of Available Subnets:     " + str(int(subnets)))
+print("Max # of Hosts per Subnet:       " + str(avail_hosts))
+#Calculate network addresses
+if class_var == "a":
+    print("\nNetwork Addresses (in 2nd octet):")
+if class_var == "b":
+    print("\nNetwork Addresses (in 3rd octet):")
+if class_var == "c":
+    print("\nNetwork Addresses (in 4th octet):")
+net_addr = 0
+net_list = []
+while net_addr < 256:
+    net_list.append(net_addr)
+    if class_var == "c":
+        addr_gap = 256 - int(octet4)
+        net_addr = net_addr + addr_gap
+    elif class_var == "b":
+        addr_gap = 256 - int(octet3)
+        net_addr = net_addr + addr_gap
+    elif class_var == "a":
+        addr_gap = 256 - int(octet2)
+        net_addr = net_addr + addr_gap
+print(net_list)
+
+input("\n\n\n\nPress ENTER to exit")
+
+
+
+
+
+
+
+
+
